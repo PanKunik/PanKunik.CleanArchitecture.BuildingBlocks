@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<PackageId>PanKunik.CleanArchitecture.BuildingBlocks</PackageId>
-		<Version>0.1.0</Version>
+		<Version>0.2.0</Version>
 		<Authors>Patryk Kunicki</Authors>
 		<Description>Building blocks for Clean Architecture and DDD concepts.</Description>
 		<PackageProjectUrl>https://github.com/pankunik/clean-architecture-building-blocks</PackageProjectUrl>
