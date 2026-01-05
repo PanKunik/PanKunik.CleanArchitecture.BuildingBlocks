@@ -1,4 +1,4 @@
-namespace CleanArchitecture.BuildingBlocks.Unit.Tests;
+namespace PanKunik.CleanArchitecture.BuildingBlocks.Unit.Tests;
 
 public class ValueObjectTests
 {

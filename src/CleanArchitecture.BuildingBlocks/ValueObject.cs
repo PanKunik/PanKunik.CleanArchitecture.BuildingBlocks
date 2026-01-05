@@ -1,4 +1,4 @@
-namespace CleanArchitecture.BuildingBlocks;
+namespace PanKunik.CleanArchitecture.BuildingBlocks;
 
 public abstract class ValueObject
     : IEquatable<ValueObject>
