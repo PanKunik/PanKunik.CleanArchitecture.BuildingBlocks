@@ -5,41 +5,135 @@ on:
     tags:
       - '*'
 
+env:
+  SOLUTION: PanKunik.CleanArchitecture.BuildingBlocks.sln
+  CONFIGURATION: RELEASE
+
 jobs:
+  restore:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      
+    steps:
+      - uses: actions/checkout@v3
+        
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '10.0.x'
+          
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        
+      - name: Cache NuGet packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore $SOLUTION
+
+      - name: Upload restore artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore
+          path: |
+            ~/.nuget/packages
+            **/**/obj
+
   build:
     runs-on: ubuntu-latest
+    needs: restore
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Setup .NET 10
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: '10.0.x'
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '10.0.x'
 
-    - name: Cache NuGet packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('src/**/*.csproj') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
+      - uses: actions/download-artifact@v4
+        with:
+          name: restore
 
-    - name: Restore dependencies
-      run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "Building project for version $VERSION"
-          dotnet restore PanKunik.CleanArchitecture.BuildingBlocks.sln
-          dotnet build PanKunik.CleanArchitecture.BuildingBlocks.sln --configuration Release --no-restore 
-          
-    - name: Pack NuGet package
-      run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          dotnet pack PanKunik.CleanArchitecture.BuildingBlocks.sln --configuration Release /p:PackageVersion=$VERSION -o ./bin/Release --no-build --no-restore
+      - name: Build
+        run: dotnet build $SOLUTION --configuration $CONFIGURATION --no-restore
 
-    - name: Publish to GitHub Packages
-      run: |
-        dotnet nuget push ./bin/Release/*.nupkg \
-          --source https://nuget.pkg.github.com/pankunik/index.json \
-          --api-key ${{ secrets.GHCR_PAT }}
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: |
+            **/bin
+            **/obj
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+
+      - name: Test
+        run: dotnet test $SOLUTION --configuration $CONFIGURATION --no-build --no-restore
+
+  pack:
+    runs-on: ubuntu-latest
+    needs: [build, restore]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+
+      - name: Pack
+        run: |
+          dotnet pack $SOLUTION \
+            --configuration $CONFIGURATION \
+            --no-build --no-restore \
+            /p:PackageVersion=${{ needs.restore.outputs.version }} \
+            -o ./nupkg
+
+      - name: Upload NuGet package
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget
+          path: ./nupkg/*.nupkg
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: pack
+
+    steps:
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nuget
+
+      - name: Publish to GitHub Packages
+        run: |
+          dotnet nuget push *.nupkg \
+            --source https://nuget.pkg.github.com/pankunik/index.json \
+            --api-key ${{ secrets.GHCR_PAT }}
