@@ -120,5 +120,5 @@ jobs:
         run: |
           dotnet nuget push *.nupkg \
             --source https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json \
-            --api-key ${{ secrets.GHCR_PAT }} \
+            --api-key ${{ secrets.GH_PAT_WRITE_PACKAGES }} \
             --skip-duplicate
